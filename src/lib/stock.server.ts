@@ -5,24 +5,51 @@ const UA =
 
 const HOSTS = ["https://query1.finance.yahoo.com", "https://query2.finance.yahoo.com"];
 
+/** Read-only relays used when the origin blocks the server's egress IP. */
+const RELAYS: ((url: string) => string)[] = [
+  (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  (url) => `https://r.jina.ai/${url}`,
+];
+
+function extractJson(text: string): any {
+  const start = text.indexOf("{");
+  if (start === -1) throw new Error("Unexpected response from data source");
+  return JSON.parse(text.slice(start));
+}
+
+async function get(url: string): Promise<any> {
+  const res = await fetch(url, { headers: { "User-Agent": UA, Accept: "application/json,text/plain,*/*" } });
+  const text = await res.text();
+  if (!res.ok && !text.trimStart().startsWith("{")) throw new Error(`Upstream returned ${res.status}`);
+  const json = extractJson(text);
+  if (json?.chart?.error) {
+    throw new Error(json.chart.error.description || "No data found");
+  }
+  return json;
+}
+
 async function yahoo(path: string): Promise<any> {
   let lastErr: unknown = null;
   for (const host of HOSTS) {
     try {
-      const res = await fetch(host + path, {
-        headers: { "User-Agent": UA, Accept: "application/json" },
-      });
-      if (!res.ok) {
-        lastErr = new Error(`Upstream returned ${res.status}`);
-        continue;
-      }
-      return await res.json();
+      return await get(host + path);
     } catch (err) {
       lastErr = err;
+      if (err instanceof Error && /No data found|delisted/i.test(err.message)) throw err;
+    }
+  }
+  for (const relay of RELAYS) {
+    for (const host of HOSTS) {
+      try {
+        return await get(relay(host + path));
+      } catch (err) {
+        lastErr = err;
+      }
     }
   }
   throw lastErr ?? new Error("Data source unreachable");
 }
+
 
 export type Quote = {
   symbol: string;
