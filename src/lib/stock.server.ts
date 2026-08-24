@@ -19,7 +19,7 @@ function extractJson(text: string): any {
 
 async function get(url: string, signal?: AbortSignal): Promise<any> {
   const res = await fetch(url, {
-    signal,
+    signal: signal ?? null,
     headers: { "User-Agent": UA, Accept: "application/json,text/plain,*/*" },
   });
   const text = await res.text();
