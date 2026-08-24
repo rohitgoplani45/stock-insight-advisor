@@ -125,18 +125,24 @@ export async function resolveAndFetch(input: string): Promise<Quote> {
   for (const candidate of direct) {
     try {
       return await fetchChart(candidate);
-    } catch {
-      /* try next */
+    } catch (err) {
+      console.error("[stock] direct fetch failed", candidate, (err as Error)?.message);
     }
   }
-  const matches = await searchSymbol(input);
+  let matches: { symbol: string; name: string }[] = [];
+  try {
+    matches = await searchSymbol(input);
+  } catch (err) {
+    console.error("[stock] search failed", input, (err as Error)?.message);
+  }
   for (const m of matches.slice(0, 4)) {
     try {
       return await fetchChart(m.symbol);
-    } catch {
-      /* try next */
+    } catch (err) {
+      console.error("[stock] match fetch failed", m.symbol, (err as Error)?.message);
     }
   }
+
   throw new Error(
     `Couldn't find "${input}" on NSE/BSE. Try the exact ticker (e.g. TATAMOTORS) or the full company name.`,
   );
