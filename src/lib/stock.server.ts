@@ -133,30 +133,29 @@ export async function fetchChart(symbol: string, range = "1y"): Promise<Quote> {
 }
 
 export async function resolveAndFetch(input: string): Promise<Quote> {
-  const diag: string[] = [];
   const direct = normalizeInput(input);
   for (const candidate of direct) {
     try {
       return await fetchChart(candidate);
     } catch (err) {
-      diag.push(`${candidate}: ${(err as Error)?.message}`);
+      /* try next */
     }
   }
   let matches: { symbol: string; name: string }[] = [];
   try {
     matches = await searchSymbol(input);
   } catch (err) {
-    diag.push(`search: ${(err as Error)?.message}`);
+      /* try next */
   }
   for (const m of matches.slice(0, 4)) {
     try {
       return await fetchChart(m.symbol);
     } catch (err) {
-      diag.push(`${m.symbol}: ${(err as Error)?.message}`);
+      /* try next */
     }
   }
 
   throw new Error(
-    `Couldn't find "${input}" on NSE/BSE. Try the exact ticker (e.g. TATAMOTORS) or the full company name. [${diag.join(" | ")}]`,
+    `Couldn't find "${input}" on NSE/BSE. Try the exact ticker (e.g. TATAMOTORS) or the full company name.`,
   );
 }
