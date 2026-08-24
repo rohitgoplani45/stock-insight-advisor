@@ -1,5 +1,7 @@
 import type { Candle } from "./analysis";
 
+/* eslint-disable @typescript-eslint/no-explicit-any -- upstream JSON is untyped */
+
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 
@@ -17,10 +19,14 @@ function extractJson(text: string): any {
   return JSON.parse(text.slice(start));
 }
 
-async function get(url: string): Promise<any> {
-  const res = await fetch(url, { headers: { "User-Agent": UA, Accept: "application/json,text/plain,*/*" } });
+async function get(url: string, signal?: AbortSignal): Promise<any> {
+  const res = await fetch(url, {
+    signal: signal ?? null,
+    headers: { "User-Agent": UA, Accept: "application/json,text/plain,*/*" },
+  });
   const text = await res.text();
-  if (!res.ok && !text.trimStart().startsWith("{")) throw new Error(`Upstream returned ${res.status}`);
+  if (!res.ok && !text.trimStart().startsWith("{"))
+    throw new Error(`Upstream returned ${res.status}`);
   const json = extractJson(text);
   if (json?.chart?.error) {
     throw new Error(json.chart.error.description || "No data found");
@@ -28,28 +34,45 @@ async function get(url: string): Promise<any> {
   return json;
 }
 
-async function yahoo(path: string): Promise<any> {
-  let lastErr: unknown = null;
-  for (const host of HOSTS) {
-    try {
-      return await get(host + path);
-    } catch (err) {
-      lastErr = err;
-      if (err instanceof Error && /No data found|delisted/i.test(err.message)) throw err;
-    }
-  }
-  for (const relay of RELAYS) {
-    for (const host of HOSTS) {
-      try {
-        return await get(relay(host + path));
-      } catch (err) {
-        lastErr = err;
-      }
-    }
-  }
-  throw lastErr ?? new Error("Data source unreachable");
-}
+const cache = new Map<string, { at: number; data: any }>();
+const TTL = 5 * 60 * 1000;
+const ATTEMPT_TIMEOUT = 9000;
 
+async function yahoo(path: string): Promise<any> {
+  const hit = cache.get(path);
+  if (hit && Date.now() - hit.at < TTL) return hit.data;
+
+  const urls = [
+    ...HOSTS.map((h) => h + path),
+    ...RELAYS.flatMap((relay) => HOSTS.map((h) => relay(h + path))),
+  ];
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ATTEMPT_TIMEOUT);
+  let notFound: Error | null = null;
+
+  const attempts = urls.map((u) =>
+    get(u, controller.signal).catch((err: unknown) => {
+      if (err instanceof Error && /No data found|delisted|Not Found/i.test(err.message))
+        notFound = err;
+      throw err;
+    }),
+  );
+
+  try {
+    const data = await Promise.any(attempts);
+    cache.set(path, { at: Date.now(), data });
+    return data;
+  } catch {
+    throw (
+      notFound ?? new Error("Market data is temporarily unavailable. Please try again in a moment.")
+    );
+  } finally {
+    clearTimeout(timer);
+    // Cancel every still-pending relay request so the response isn't held open.
+    controller.abort();
+  }
+}
 
 export type Quote = {
   symbol: string;
@@ -62,12 +85,17 @@ export type Quote = {
 export async function searchSymbol(query: string): Promise<{ symbol: string; name: string }[]> {
   const q = query.trim();
   if (!q) return [];
-  const data = await yahoo(`/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=12&newsCount=0`);
+  const data = await yahoo(
+    `/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=12&newsCount=0`,
+  );
   const quotes: any[] = data?.quotes ?? [];
   return quotes
     .filter((x) => typeof x.symbol === "string" && /\.(NS|BO)$/i.test(x.symbol))
     .sort((a, b) => (a.symbol.endsWith(".NS") ? -1 : 1) - (b.symbol.endsWith(".NS") ? -1 : 1))
-    .map((x) => ({ symbol: x.symbol as string, name: (x.longname || x.shortname || x.symbol) as string }));
+    .map((x) => ({
+      symbol: x.symbol as string,
+      name: (x.longname || x.shortname || x.symbol) as string,
+    }));
 }
 
 function normalizeInput(raw: string): string[] {
@@ -121,7 +149,12 @@ export async function resolveAndFetch(input: string): Promise<Quote> {
       /* try next */
     }
   }
-  const matches = await searchSymbol(input);
+  let matches: { symbol: string; name: string }[] = [];
+  try {
+    matches = await searchSymbol(input);
+  } catch {
+    /* try next */
+  }
   for (const m of matches.slice(0, 4)) {
     try {
       return await fetchChart(m.symbol);
@@ -129,6 +162,7 @@ export async function resolveAndFetch(input: string): Promise<Quote> {
       /* try next */
     }
   }
+
   throw new Error(
     `Couldn't find "${input}" on NSE/BSE. Try the exact ticker (e.g. TATAMOTORS) or the full company name.`,
   );
