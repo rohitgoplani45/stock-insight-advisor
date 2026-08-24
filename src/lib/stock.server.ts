@@ -28,27 +28,35 @@ async function get(url: string): Promise<any> {
   return json;
 }
 
+const cache = new Map<string, { at: number; data: any }>();
+const TTL = 5 * 60 * 1000;
+
 async function yahoo(path: string): Promise<any> {
-  let lastErr: unknown = null;
-  for (const host of HOSTS) {
-    try {
-      return await get(host + path);
-    } catch (err) {
-      lastErr = err;
-      if (err instanceof Error && /No data found|delisted/i.test(err.message)) throw err;
-    }
+  const hit = cache.get(path);
+  if (hit && Date.now() - hit.at < TTL) return hit.data;
+
+  const urls = [
+    ...HOSTS.map((h) => h + path),
+    ...RELAYS.flatMap((relay) => HOSTS.map((h) => relay(h + path))),
+  ];
+
+  let notFound: Error | null = null;
+  const attempts = urls.map((u) =>
+    get(u).catch((err: unknown) => {
+      if (err instanceof Error && /No data found|delisted|Not Found/i.test(err.message)) notFound = err;
+      throw err;
+    }),
+  );
+
+  try {
+    const data = await Promise.any(attempts);
+    cache.set(path, { at: Date.now(), data });
+    return data;
+  } catch {
+    throw notFound ?? new Error("Market data source is busy right now. Try again in a moment.");
   }
-  for (const relay of RELAYS) {
-    for (const host of HOSTS) {
-      try {
-        return await get(relay(host + path));
-      } catch (err) {
-        lastErr = err;
-      }
-    }
-  }
-  throw lastErr ?? new Error("Data source unreachable");
 }
+
 
 
 export type Quote = {
