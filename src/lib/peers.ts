@@ -4,7 +4,8 @@ export const PEER_GROUPS: { sector: string; symbols: { symbol: string; name: str
   {
     sector: "Automobiles",
     symbols: [
-      { symbol: "TATAMOTORS.NS", name: "Tata Motors" },
+      { symbol: "TMPV.NS", name: "Tata Motors Passenger Vehicles" },
+      { symbol: "TMCV.NS", name: "Tata Motors (Commercial Vehicles)" },
       { symbol: "M&M.NS", name: "Mahindra & Mahindra" },
       { symbol: "MARUTI.NS", name: "Maruti Suzuki" },
       { symbol: "BAJAJ-AUTO.NS", name: "Bajaj Auto" },
