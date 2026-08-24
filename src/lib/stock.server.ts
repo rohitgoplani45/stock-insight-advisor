@@ -137,20 +137,20 @@ export async function resolveAndFetch(input: string): Promise<Quote> {
   for (const candidate of direct) {
     try {
       return await fetchChart(candidate);
-    } catch (err) {
+    } catch {
       /* try next */
     }
   }
   let matches: { symbol: string; name: string }[] = [];
   try {
     matches = await searchSymbol(input);
-  } catch (err) {
+  } catch {
       /* try next */
   }
   for (const m of matches.slice(0, 4)) {
     try {
       return await fetchChart(m.symbol);
-    } catch (err) {
+    } catch {
       /* try next */
     }
   }
