@@ -23,7 +23,8 @@ async function get(url: string, signal?: AbortSignal): Promise<any> {
     headers: { "User-Agent": UA, Accept: "application/json,text/plain,*/*" },
   });
   const text = await res.text();
-  if (!res.ok && !text.trimStart().startsWith("{")) throw new Error(`Upstream returned ${res.status}`);
+  if (!res.ok && !text.trimStart().startsWith("{"))
+    throw new Error(`Upstream returned ${res.status}`);
   const json = extractJson(text);
   if (json?.chart?.error) {
     throw new Error(json.chart.error.description || "No data found");
@@ -50,7 +51,8 @@ async function yahoo(path: string): Promise<any> {
 
   const attempts = urls.map((u) =>
     get(u, controller.signal).catch((err: unknown) => {
-      if (err instanceof Error && /No data found|delisted|Not Found/i.test(err.message)) notFound = err;
+      if (err instanceof Error && /No data found|delisted|Not Found/i.test(err.message))
+        notFound = err;
       throw err;
     }),
   );
@@ -60,16 +62,15 @@ async function yahoo(path: string): Promise<any> {
     cache.set(path, { at: Date.now(), data });
     return data;
   } catch {
-    throw notFound ?? new Error("Market data is temporarily unavailable. Please try again in a moment.");
+    throw (
+      notFound ?? new Error("Market data is temporarily unavailable. Please try again in a moment.")
+    );
   } finally {
     clearTimeout(timer);
     // Cancel every still-pending relay request so the response isn't held open.
     controller.abort();
   }
 }
-
-
-
 
 export type Quote = {
   symbol: string;
@@ -82,12 +83,17 @@ export type Quote = {
 export async function searchSymbol(query: string): Promise<{ symbol: string; name: string }[]> {
   const q = query.trim();
   if (!q) return [];
-  const data = await yahoo(`/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=12&newsCount=0`);
+  const data = await yahoo(
+    `/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=12&newsCount=0`,
+  );
   const quotes: any[] = data?.quotes ?? [];
   return quotes
     .filter((x) => typeof x.symbol === "string" && /\.(NS|BO)$/i.test(x.symbol))
     .sort((a, b) => (a.symbol.endsWith(".NS") ? -1 : 1) - (b.symbol.endsWith(".NS") ? -1 : 1))
-    .map((x) => ({ symbol: x.symbol as string, name: (x.longname || x.shortname || x.symbol) as string }));
+    .map((x) => ({
+      symbol: x.symbol as string,
+      name: (x.longname || x.shortname || x.symbol) as string,
+    }));
 }
 
 function normalizeInput(raw: string): string[] {
@@ -145,7 +151,7 @@ export async function resolveAndFetch(input: string): Promise<Quote> {
   try {
     matches = await searchSymbol(input);
   } catch {
-      /* try next */
+    /* try next */
   }
   for (const m of matches.slice(0, 4)) {
     try {
