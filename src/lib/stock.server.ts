@@ -121,29 +121,30 @@ export async function fetchChart(symbol: string, range = "1y"): Promise<Quote> {
 }
 
 export async function resolveAndFetch(input: string): Promise<Quote> {
+  const diag: string[] = [];
   const direct = normalizeInput(input);
   for (const candidate of direct) {
     try {
       return await fetchChart(candidate);
     } catch (err) {
-      console.error("[stock] direct fetch failed", candidate, (err as Error)?.message);
+      diag.push(`${candidate}: ${(err as Error)?.message}`);
     }
   }
   let matches: { symbol: string; name: string }[] = [];
   try {
     matches = await searchSymbol(input);
   } catch (err) {
-    console.error("[stock] search failed", input, (err as Error)?.message);
+    diag.push(`search: ${(err as Error)?.message}`);
   }
   for (const m of matches.slice(0, 4)) {
     try {
       return await fetchChart(m.symbol);
     } catch (err) {
-      console.error("[stock] match fetch failed", m.symbol, (err as Error)?.message);
+      diag.push(`${m.symbol}: ${(err as Error)?.message}`);
     }
   }
 
   throw new Error(
-    `Couldn't find "${input}" on NSE/BSE. Try the exact ticker (e.g. TATAMOTORS) or the full company name.`,
+    `Couldn't find "${input}" on NSE/BSE. Try the exact ticker (e.g. TATAMOTORS) or the full company name. [${diag.join(" | ")}]`,
   );
 }
