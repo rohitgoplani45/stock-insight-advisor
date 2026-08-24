@@ -1,5 +1,7 @@
 import type { Candle } from "./analysis";
 
+/* eslint-disable @typescript-eslint/no-explicit-any -- upstream JSON is untyped */
+
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 
