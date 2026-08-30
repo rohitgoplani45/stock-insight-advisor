@@ -14,6 +14,7 @@ export type Verdict = "BUY" | "WAIT" | "DON'T BUY";
 export type Analysis = {
   verdict: Verdict;
   score: number;
+  history: { days: number; isNewListing: boolean; hasFullYear: boolean };
   currentPrice: number;
   prevClose: number;
   dayChangePct: number;
