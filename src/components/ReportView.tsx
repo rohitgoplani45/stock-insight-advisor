@@ -167,7 +167,9 @@ export function ReportView({ report }: { report: Report }) {
             </div>
           ))}
           <div className="border-border/60 flex items-baseline justify-between gap-4 border-b pb-2">
-            <span className="text-muted-foreground text-sm">52-week range</span>
+            <span className="text-muted-foreground text-sm">
+              {a.history.hasFullYear ? "52-week range" : "Range since listing"}
+            </span>
             <span className="num text-sm">
               ₹{fmt(a.low52)} – ₹{fmt(a.high52)}
             </span>
