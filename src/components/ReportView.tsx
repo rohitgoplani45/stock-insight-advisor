@@ -44,6 +44,11 @@ export function ReportView({ report }: { report: Report }) {
               {report.exchange} · {report.symbol}
             </p>
             <h1 className="mt-1 text-2xl leading-tight sm:text-3xl">{report.name}</h1>
+            {a.history.isNewListing && (
+              <span className="mt-2 inline-block rounded-full border border-[color:var(--gold)]/40 px-3 py-1 text-[11px] tracking-wide text-[color:var(--gold)] uppercase">
+                Recently listed · {a.history.days} trading days
+              </span>
+            )}
           </div>
           <div className="text-right">
             <p className="eyebrow">Market price</p>
