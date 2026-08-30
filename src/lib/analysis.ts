@@ -142,6 +142,30 @@ export function analyze(candles: Candle[], inputPrice: number): Analysis {
     }
   }
 
+  if (ma50 == null) {
+    signals.push({
+      label: "Trend (50 / 200 DMA)",
+      value: `Not enough history — ${days} trading days`,
+      tone: "neutral",
+    });
+    if (maShort != null && maMid != null) {
+      const above = currentPrice > maShort && maShort > maMid;
+      const below = currentPrice < maShort && maShort < maMid;
+      if (above) score += 1;
+      if (below) score -= 1;
+      signals.push({
+        label: "Short-term trend (10 vs 20 day)",
+        value: above ? "Rising since listing" : below ? "Fading since listing" : "Choppy since listing",
+        tone: above ? "good" : below ? "bad" : "neutral",
+      });
+      if (below) reasons.push("Since listing the stock has been drifting lower — the post-IPO trend is not yet supportive.");
+    }
+    reasons.push(
+      `This stock has only ${days} trading sessions of price history, so trend signals are provisional.`,
+    );
+  }
+
+
   if (rsiValue != null) {
     if (rsiValue > 70) {
       score -= 2;
