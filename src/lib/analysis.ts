@@ -88,20 +88,28 @@ export function analyze(candles: Candle[], inputPrice: number): Analysis {
   const prevClose: number = closes[closes.length - 2] ?? currentPrice;
   const dayChangePct = ((currentPrice - prevClose) / prevClose) * 100;
 
+  const days = closes.length;
+  const isNewListing = days < 120;
+  const hasFullYear = days >= 240;
+
   const ma50 = sma(closes, 50);
   const ma200 = sma(closes, 200);
-  const rsiValue = rsi(closes);
+  const rsiValue = closes.length >= 15 ? rsi(closes) : null;
+  // Short-window substitutes used while long averages are still forming.
+  const maShort = sma(closes, Math.min(10, days));
+  const maMid = sma(closes, Math.min(20, days));
 
-  const recentVol = avg(volumes.slice(-10));
-  const baseVol = avg(volumes.slice(-60, -10));
+  const volWindow = Math.min(60, days);
+  const recentVol = avg(volumes.slice(-Math.min(10, days)));
+  const baseVol = days >= 20 ? avg(volumes.slice(-volWindow, -Math.min(10, days))) : 0;
   const volumeTrendPct = baseVol ? ((recentVol - baseVol) / baseVol) * 100 : null;
 
   const window = closes.slice(-252);
   const high52 = Math.max(...window);
   const low52 = Math.min(...window);
-  const volatilityPct = stdevPct(closes.slice(-60));
+  const volatilityPct = stdevPct(closes.slice(-volWindow));
 
-  const recent = candles.slice(-60);
+  const recent = candles.slice(-volWindow);
   const support = Math.min(...recent.map((c) => c.l));
   const resistance = Math.max(...recent.map((c) => c.h));
 
