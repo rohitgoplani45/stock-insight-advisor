@@ -223,6 +223,14 @@ export function analyze(candles: Candle[], inputPrice: number): Analysis {
   else if (score <= -1.5) verdict = "DON'T BUY";
   else verdict = "WAIT";
 
+  // A freshly listed stock has too little tape to justify a confident BUY.
+  if (verdict === "BUY" && days < 60) {
+    verdict = "WAIT";
+    reasons.push(
+      `Listed too recently (${days} sessions) to confirm a trend — the setup looks fine, but wait for the post-listing base to form.`,
+    );
+  }
+
   if (verdict !== "DON'T BUY" && reasons.length === 0) {
     reasons.push("No major red flags in the current trend structure.");
   }
