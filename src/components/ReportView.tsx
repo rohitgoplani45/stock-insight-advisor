@@ -77,6 +77,12 @@ export function ReportView({ report }: { report: Report }) {
               ? "Nothing broken, but nothing compelling at this price. Patience is the edge here."
               : "The signals argue against putting fresh money in at this level."}
         </p>
+        {a.history.isNewListing && (
+          <p className="mt-3 max-w-2xl text-sm text-[color:var(--gold)]">
+            This stock has only {a.history.days} trading sessions since listing, so this verdict is based on limited
+            history and carries lower confidence than usual.
+          </p>
+        )}
 
         <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
           {[
