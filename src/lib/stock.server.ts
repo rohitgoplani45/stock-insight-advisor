@@ -127,7 +127,17 @@ export async function fetchChart(symbol: string, range = "1y"): Promise<Quote> {
       v: q.volume?.[i] ?? 0,
     });
   }
-  if (candles.length < 30) throw new Error(`Not enough price history for ${symbol}`);
+  // Recently listed stocks return very little for a 1y window — retry with the
+  // full listing history before giving up.
+  if (candles.length < 30 && range !== "max") {
+    try {
+      const full = await fetchChart(symbol, "max");
+      if (full.candles.length > candles.length) return full;
+    } catch {
+      /* fall through to the short series below */
+    }
+  }
+  if (candles.length < 5) throw new Error(`Not enough price history for ${symbol}`);
   if (meta.regularMarketPrice && candles.length) {
     candles[candles.length - 1]!.c = meta.regularMarketPrice;
   }

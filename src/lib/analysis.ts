@@ -14,6 +14,7 @@ export type Verdict = "BUY" | "WAIT" | "DON'T BUY";
 export type Analysis = {
   verdict: Verdict;
   score: number;
+  history: { days: number; isNewListing: boolean; hasFullYear: boolean };
   currentPrice: number;
   prevClose: number;
   dayChangePct: number;
@@ -87,20 +88,28 @@ export function analyze(candles: Candle[], inputPrice: number): Analysis {
   const prevClose: number = closes[closes.length - 2] ?? currentPrice;
   const dayChangePct = ((currentPrice - prevClose) / prevClose) * 100;
 
+  const days = closes.length;
+  const isNewListing = days < 120;
+  const hasFullYear = days >= 240;
+
   const ma50 = sma(closes, 50);
   const ma200 = sma(closes, 200);
-  const rsiValue = rsi(closes);
+  const rsiValue = closes.length >= 15 ? rsi(closes) : null;
+  // Short-window substitutes used while long averages are still forming.
+  const maShort = sma(closes, Math.min(10, days));
+  const maMid = sma(closes, Math.min(20, days));
 
-  const recentVol = avg(volumes.slice(-10));
-  const baseVol = avg(volumes.slice(-60, -10));
+  const volWindow = Math.min(60, days);
+  const recentVol = avg(volumes.slice(-Math.min(10, days)));
+  const baseVol = days >= 20 ? avg(volumes.slice(-volWindow, -Math.min(10, days))) : 0;
   const volumeTrendPct = baseVol ? ((recentVol - baseVol) / baseVol) * 100 : null;
 
   const window = closes.slice(-252);
   const high52 = Math.max(...window);
   const low52 = Math.min(...window);
-  const volatilityPct = stdevPct(closes.slice(-60));
+  const volatilityPct = stdevPct(closes.slice(-volWindow));
 
-  const recent = candles.slice(-60);
+  const recent = candles.slice(-volWindow);
   const support = Math.min(...recent.map((c) => c.l));
   const resistance = Math.max(...recent.map((c) => c.h));
 
@@ -133,6 +142,30 @@ export function analyze(candles: Candle[], inputPrice: number): Analysis {
     }
   }
 
+  if (ma50 == null) {
+    signals.push({
+      label: "Trend (50 / 200 DMA)",
+      value: `Not enough history — ${days} trading days`,
+      tone: "neutral",
+    });
+    if (maShort != null && maMid != null) {
+      const above = currentPrice > maShort && maShort > maMid;
+      const below = currentPrice < maShort && maShort < maMid;
+      if (above) score += 1;
+      if (below) score -= 1;
+      signals.push({
+        label: "Short-term trend (10 vs 20 day)",
+        value: above ? "Rising since listing" : below ? "Fading since listing" : "Choppy since listing",
+        tone: above ? "good" : below ? "bad" : "neutral",
+      });
+      if (below) reasons.push("Since listing the stock has been drifting lower — the post-IPO trend is not yet supportive.");
+    }
+    reasons.push(
+      `This stock has only ${days} trading sessions of price history, so trend signals are provisional.`,
+    );
+  }
+
+
   if (rsiValue != null) {
     if (rsiValue > 70) {
       score -= 2;
@@ -162,13 +195,17 @@ export function analyze(candles: Candle[], inputPrice: number): Analysis {
 
   const fromHigh = ((currentPrice - high52) / high52) * 100;
   signals.push({
-    label: "From 52-week high",
+    label: hasFullYear ? "From 52-week high" : "From high since listing",
     value: pct(fromHigh),
     tone: fromHigh > -5 ? "good" : fromHigh < -25 ? "bad" : "neutral",
   });
   if (fromHigh > -2) {
     score -= 0.5;
-    reasons.push("The stock is right at its 52-week high, so you'd be buying with little margin of safety.");
+    reasons.push(
+      hasFullYear
+        ? "The stock is right at its 52-week high, so you'd be buying with little margin of safety."
+        : "The stock is at its highest level since listing, so you'd be buying with little margin of safety.",
+    );
   }
 
   // Entry price quality
@@ -186,6 +223,14 @@ export function analyze(candles: Candle[], inputPrice: number): Analysis {
   else if (score <= -1.5) verdict = "DON'T BUY";
   else verdict = "WAIT";
 
+  // A freshly listed stock has too little tape to justify a confident BUY.
+  if (verdict === "BUY" && days < 60) {
+    verdict = "WAIT";
+    reasons.push(
+      `Listed too recently (${days} sessions) to confirm a trend — the setup looks fine, but wait for the post-listing base to form.`,
+    );
+  }
+
   if (verdict !== "DON'T BUY" && reasons.length === 0) {
     reasons.push("No major red flags in the current trend structure.");
   }
@@ -201,28 +246,38 @@ export function analyze(candles: Candle[], inputPrice: number): Analysis {
   // Timing
   const dipTarget = Math.max(support, currentPrice * (1 - volatilityPct * 0.02));
   const daysToDip = Math.round(Math.max(3, ((currentPrice - dipTarget) / currentPrice) * 100 / Math.max(volatilityPct, 0.4)));
-  const timingLikely = rsiValue != null && (rsiValue > 62 || currentPrice > (ma50 ?? 0) * 1.08);
-  const timing = timingLikely
-    ? `A better entry looks likely. With this stock's recent swing of about ${volatilityPct.toFixed(1)}% a day, a pullback toward ₹${fmt(dipTarget)} is plausible within roughly ${daysToDip}–${daysToDip * 3} trading days.`
-    : `No obvious cheaper window. The stock is not stretched, so waiting risks chasing it higher; staggering your buy across 2–3 tranches is the sensible play.`;
+  const trendRef = ma50 ?? maMid;
+  const timingLikely = isNewListing
+    ? true
+    : rsiValue != null && (rsiValue > 62 || currentPrice > (ma50 ?? 0) * 1.08);
+  const timing = isNewListing
+    ? `Newly listed stocks stay volatile for months while price discovery plays out, and supply from anchor and pre-IPO investors typically hits once lock-ins expire. With daily swings of about ${volatilityPct.toFixed(1)}%, a pullback toward ₹${fmt(dipTarget)} is quite possible — buying in tranches rather than all at once is the safer route here.`
+    : timingLikely
+      ? `A better entry looks likely. With this stock's recent swing of about ${volatilityPct.toFixed(1)}% a day, a pullback toward ₹${fmt(dipTarget)} is plausible within roughly ${daysToDip}–${daysToDip * 3} trading days.`
+      : `No obvious cheaper window. The stock is not stretched, so waiting risks chasing it higher; staggering your buy across 2–3 tranches is the sensible play.`;
 
   // Outlook
   const momentum = ma50 && ma200 ? (ma50 / ma200 - 1) * 100 : 0;
-  const trendPct = ((currentPrice - ((closes[closes.length - 64] ?? currentPrice))) / ((closes[closes.length - 64] ?? currentPrice))) * 100;
+  const lookback = Math.min(64, Math.max(5, days - 1));
+  const past = closes[closes.length - lookback] ?? currentPrice;
+  const trendPct = ((currentPrice - past) / past) * 100;
   let outlookPct = momentum * 1.2 + trendPct * 0.35 + (score - 1) * 1.1;
+  if (isNewListing) outlookPct *= 0.7;
   outlookPct = Math.max(-28, Math.min(32, outlookPct));
-  const band = Math.max(3, volatilityPct * 4);
+  const band = Math.max(3, volatilityPct * 4) * (isNewListing ? 1.6 : 1);
   const outlookDirection = outlookPct > 2 ? "up" : outlookPct < -2 ? "down" : "flat";
-  const outlookTimeframe = "next 3–6 months";
+  const outlookTimeframe = isNewListing ? "next 1–3 months" : "next 3–6 months";
   const outlookReasoning =
     `${outlookDirection === "up" ? "The structure is constructive" : outlookDirection === "down" ? "The structure is deteriorating" : "The structure is range-bound"}: ` +
-    `${ma50 && ma200 ? (ma50 > ma200 ? "the 50-day average is holding above the 200-day" : "the 50-day average is trailing the 200-day") : "moving averages are still forming"}, ` +
+    `${ma50 && ma200 ? (ma50 > ma200 ? "the 50-day average is holding above the 200-day" : "the 50-day average is trailing the 200-day") : `only ${days} sessions of history exist, so long averages are still forming${trendRef != null ? ` and price is ${currentPrice > trendRef ? "above" : "below"} its short-term average` : ""}`}, ` +
     `RSI is at ${rsiValue?.toFixed(0) ?? "n/a"}, and volumes are ${volumeTrendPct != null && volumeTrendPct > 15 ? "expanding" : volumeTrendPct != null && volumeTrendPct < -15 ? "contracting" : "steady"}. ` +
-    `Extending that trend, a move of roughly ${pct(outlookPct)} over the ${outlookTimeframe} is the base case, with support near ₹${fmt(support)} and resistance near ₹${fmt(resistance)}.`;
+    `Extending that trend, a move of roughly ${pct(outlookPct)} over the ${outlookTimeframe} is the base case, with support near ₹${fmt(support)} and resistance near ₹${fmt(resistance)}.` +
+    (isNewListing ? " Treat this as a wide, low-confidence range given the short trading history." : "");
 
   return {
     verdict,
     score,
+    history: { days, isNewListing, hasFullYear },
     currentPrice,
     prevClose,
     dayChangePct,

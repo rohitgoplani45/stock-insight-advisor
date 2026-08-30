@@ -29,6 +29,7 @@ export function SnapshotCard({ report, innerRef }: { report: Report; innerRef: R
         <div>
           <p className="eyebrow">
             {report.exchange} · {report.symbol}
+            {a.history.isNewListing ? ` · Recently listed (${a.history.days} sessions)` : ""}
           </p>
           <p style={{ fontFamily: "var(--font-display)", fontSize: 34, marginTop: 4 }}>{report.name}</p>
         </div>
