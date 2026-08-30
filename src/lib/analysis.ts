@@ -246,28 +246,38 @@ export function analyze(candles: Candle[], inputPrice: number): Analysis {
   // Timing
   const dipTarget = Math.max(support, currentPrice * (1 - volatilityPct * 0.02));
   const daysToDip = Math.round(Math.max(3, ((currentPrice - dipTarget) / currentPrice) * 100 / Math.max(volatilityPct, 0.4)));
-  const timingLikely = rsiValue != null && (rsiValue > 62 || currentPrice > (ma50 ?? 0) * 1.08);
-  const timing = timingLikely
-    ? `A better entry looks likely. With this stock's recent swing of about ${volatilityPct.toFixed(1)}% a day, a pullback toward ₹${fmt(dipTarget)} is plausible within roughly ${daysToDip}–${daysToDip * 3} trading days.`
-    : `No obvious cheaper window. The stock is not stretched, so waiting risks chasing it higher; staggering your buy across 2–3 tranches is the sensible play.`;
+  const trendRef = ma50 ?? maMid;
+  const timingLikely = isNewListing
+    ? true
+    : rsiValue != null && (rsiValue > 62 || currentPrice > (ma50 ?? 0) * 1.08);
+  const timing = isNewListing
+    ? `Newly listed stocks stay volatile for months while price discovery plays out, and supply from anchor and pre-IPO investors typically hits once lock-ins expire. With daily swings of about ${volatilityPct.toFixed(1)}%, a pullback toward ₹${fmt(dipTarget)} is quite possible — buying in tranches rather than all at once is the safer route here.`
+    : timingLikely
+      ? `A better entry looks likely. With this stock's recent swing of about ${volatilityPct.toFixed(1)}% a day, a pullback toward ₹${fmt(dipTarget)} is plausible within roughly ${daysToDip}–${daysToDip * 3} trading days.`
+      : `No obvious cheaper window. The stock is not stretched, so waiting risks chasing it higher; staggering your buy across 2–3 tranches is the sensible play.`;
 
   // Outlook
   const momentum = ma50 && ma200 ? (ma50 / ma200 - 1) * 100 : 0;
-  const trendPct = ((currentPrice - ((closes[closes.length - 64] ?? currentPrice))) / ((closes[closes.length - 64] ?? currentPrice))) * 100;
+  const lookback = Math.min(64, Math.max(5, days - 1));
+  const past = closes[closes.length - lookback] ?? currentPrice;
+  const trendPct = ((currentPrice - past) / past) * 100;
   let outlookPct = momentum * 1.2 + trendPct * 0.35 + (score - 1) * 1.1;
+  if (isNewListing) outlookPct *= 0.7;
   outlookPct = Math.max(-28, Math.min(32, outlookPct));
-  const band = Math.max(3, volatilityPct * 4);
+  const band = Math.max(3, volatilityPct * 4) * (isNewListing ? 1.6 : 1);
   const outlookDirection = outlookPct > 2 ? "up" : outlookPct < -2 ? "down" : "flat";
-  const outlookTimeframe = "next 3–6 months";
+  const outlookTimeframe = isNewListing ? "next 1–3 months" : "next 3–6 months";
   const outlookReasoning =
     `${outlookDirection === "up" ? "The structure is constructive" : outlookDirection === "down" ? "The structure is deteriorating" : "The structure is range-bound"}: ` +
-    `${ma50 && ma200 ? (ma50 > ma200 ? "the 50-day average is holding above the 200-day" : "the 50-day average is trailing the 200-day") : "moving averages are still forming"}, ` +
+    `${ma50 && ma200 ? (ma50 > ma200 ? "the 50-day average is holding above the 200-day" : "the 50-day average is trailing the 200-day") : `only ${days} sessions of history exist, so long averages are still forming${trendRef != null ? ` and price is ${currentPrice > trendRef ? "above" : "below"} its short-term average` : ""}`}, ` +
     `RSI is at ${rsiValue?.toFixed(0) ?? "n/a"}, and volumes are ${volumeTrendPct != null && volumeTrendPct > 15 ? "expanding" : volumeTrendPct != null && volumeTrendPct < -15 ? "contracting" : "steady"}. ` +
-    `Extending that trend, a move of roughly ${pct(outlookPct)} over the ${outlookTimeframe} is the base case, with support near ₹${fmt(support)} and resistance near ₹${fmt(resistance)}.`;
+    `Extending that trend, a move of roughly ${pct(outlookPct)} over the ${outlookTimeframe} is the base case, with support near ₹${fmt(support)} and resistance near ₹${fmt(resistance)}.` +
+    (isNewListing ? " Treat this as a wide, low-confidence range given the short trading history." : "");
 
   return {
     verdict,
     score,
+    history: { days, isNewListing, hasFullYear },
     currentPrice,
     prevClose,
     dayChangePct,
