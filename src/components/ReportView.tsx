@@ -129,7 +129,7 @@ export function ReportView({ report }: { report: Report }) {
       </Section>
 
       {/* CHART */}
-      <Section title="Price history · 6 months" delay={120}>
+      <Section title={a.history.isNewListing ? "Price history · since listing" : "Price history · 6 months"} delay={120}>
         <PriceChart candles={report.candles} allCloses={closes} inputPrice={report.inputPrice} />
         <div className="text-muted-foreground mt-4 flex flex-wrap gap-x-6 gap-y-2 text-xs">
           <span className="flex items-center gap-2">
