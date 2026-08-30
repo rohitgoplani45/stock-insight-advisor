@@ -195,13 +195,17 @@ export function analyze(candles: Candle[], inputPrice: number): Analysis {
 
   const fromHigh = ((currentPrice - high52) / high52) * 100;
   signals.push({
-    label: "From 52-week high",
+    label: hasFullYear ? "From 52-week high" : "From high since listing",
     value: pct(fromHigh),
     tone: fromHigh > -5 ? "good" : fromHigh < -25 ? "bad" : "neutral",
   });
   if (fromHigh > -2) {
     score -= 0.5;
-    reasons.push("The stock is right at its 52-week high, so you'd be buying with little margin of safety.");
+    reasons.push(
+      hasFullYear
+        ? "The stock is right at its 52-week high, so you'd be buying with little margin of safety."
+        : "The stock is at its highest level since listing, so you'd be buying with little margin of safety.",
+    );
   }
 
   // Entry price quality
