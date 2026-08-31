@@ -50,3 +50,10 @@ A new **IPO Watch** page appears in the app. It lists Indian IPOs (mainboard + S
 
 5. **Error handling**
    - If the external tracker is unreachable, show a friendly message with a retry button instead of crashing the page.
+
+6. **Stock search typeahead**
+   - Reuse the existing `searchSymbol` server function (Yahoo search, already filtered to `.NS`/`.BO`), exposed through a debounced (~250ms) server-function call from the input.
+   - Add a local fuzzy-rank pass over the returned matches so near-miss spellings order sensibly, and keep a small in-memory cache of recent queries.
+   - New `src/components/StockSearch.tsx` with an accessible combobox (listbox roles, arrow/Enter/Escape handling); selecting an option stores the resolved ticker and passes it to `analyzeStock` so resolution can't drift.
+   - Recent selections persisted in `localStorage`, read after hydration to avoid SSR mismatch.
+
