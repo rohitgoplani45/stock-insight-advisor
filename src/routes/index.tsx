@@ -122,6 +122,9 @@ function Index() {
         <p className="text-muted-foreground mx-auto mt-4 max-w-md text-sm">
           One question, one considered answer: should you buy this stock, at this price, today?
         </p>
+        <Link to="/ipo" className="mt-4 inline-block text-xs text-[color:var(--gold)] hover:underline">
+          IPO Watch — live GMP &amp; subscription →
+        </Link>
       </header>
 
       <form onSubmit={onSubmit} className="panel space-y-5 p-5 sm:p-7">
@@ -129,17 +132,8 @@ function Index() {
           <label htmlFor="stock" className="eyebrow">
             Stock name or symbol
           </label>
-          <div className="relative mt-2">
-            <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-            <input
-              id="stock"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Tata Motors or TATAMOTORS"
-              autoComplete="off"
-              className="border-border bg-[color:var(--surface-raised)] focus:border-[color:var(--gold)] focus:ring-0 h-12 w-full rounded-lg border pr-3 pl-9 text-base outline-none transition-colors"
-            />
-          </div>
+          <StockSearch value={query} onChange={setQuery} selected={picked} onSelect={setPicked} />
+
         </div>
 
         <div className="grid grid-cols-2 gap-4">
