@@ -1,14 +1,16 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { Download, ImageDown, Loader2, Search } from "lucide-react";
+import { Download, ImageDown, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { ReportView } from "@/components/ReportView";
 import { SnapshotCard } from "@/components/SnapshotCard";
+import { StockSearch, type StockPick } from "@/components/StockSearch";
 import { Toaster } from "@/components/ui/sonner";
 import { downloadFile, fetchLog, saveReport, toCsv, type LogRow } from "@/lib/log";
 import { analyzeStock, type Report } from "@/lib/stock.functions";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -28,14 +30,20 @@ export const Route = createFileRoute("/")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
+  validateSearch: (search: Record<string, unknown>): { q?: string } =>
+    typeof search["q"] === "string" && search["q"] ? { q: search["q"] } : {},
+
   component: Index,
 });
 
 function Index() {
+  const { q } = Route.useSearch();
   const runAnalysis = useServerFn(analyzeStock);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(q ?? "");
+  const [picked, setPicked] = useState<StockPick | null>(null);
   const [quantity, setQuantity] = useState("");
   const [price, setPrice] = useState("");
+
   const [loading, setLoading] = useState(false);
   const [report, setReport] = useState<Report | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -61,7 +69,10 @@ function Index() {
     setLoading(true);
     setError(null);
     try {
-      const result = await runAnalysis({ data: { query: query.trim(), quantity: qty, inputPrice: px } });
+      const result = await runAnalysis({
+        data: { query: (picked?.symbol ?? query).trim(), quantity: qty, inputPrice: px },
+      });
+
       setReport(result);
       const row = await saveReport(result);
       if (row) setLog((prev) => [row, ...prev]);
@@ -111,6 +122,9 @@ function Index() {
         <p className="text-muted-foreground mx-auto mt-4 max-w-md text-sm">
           One question, one considered answer: should you buy this stock, at this price, today?
         </p>
+        <Link to="/ipo" className="mt-4 inline-block text-xs text-[color:var(--gold)] hover:underline">
+          IPO Watch — live GMP &amp; subscription →
+        </Link>
       </header>
 
       <form onSubmit={onSubmit} className="panel space-y-5 p-5 sm:p-7">
@@ -118,17 +132,8 @@ function Index() {
           <label htmlFor="stock" className="eyebrow">
             Stock name or symbol
           </label>
-          <div className="relative mt-2">
-            <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-            <input
-              id="stock"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Tata Motors or TATAMOTORS"
-              autoComplete="off"
-              className="border-border bg-[color:var(--surface-raised)] focus:border-[color:var(--gold)] focus:ring-0 h-12 w-full rounded-lg border pr-3 pl-9 text-base outline-none transition-colors"
-            />
-          </div>
+          <StockSearch value={query} onChange={setQuery} selected={picked} onSelect={setPicked} />
+
         </div>
 
         <div className="grid grid-cols-2 gap-4">
