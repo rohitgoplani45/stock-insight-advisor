@@ -69,7 +69,10 @@ function Index() {
     setLoading(true);
     setError(null);
     try {
-      const result = await runAnalysis({ data: { query: query.trim(), quantity: qty, inputPrice: px } });
+      const result = await runAnalysis({
+        data: { query: (picked?.symbol ?? query).trim(), quantity: qty, inputPrice: px },
+      });
+
       setReport(result);
       const row = await saveReport(result);
       if (row) setLog((prev) => [row, ...prev]);
