@@ -30,14 +30,20 @@ export const Route = createFileRoute("/")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
+  validateSearch: (search: Record<string, unknown>) => ({
+    q: typeof search["q"] === "string" ? search["q"] : "",
+  }),
   component: Index,
 });
 
 function Index() {
+  const { q } = Route.useSearch();
   const runAnalysis = useServerFn(analyzeStock);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(q);
+  const [picked, setPicked] = useState<StockPick | null>(null);
   const [quantity, setQuantity] = useState("");
   const [price, setPrice] = useState("");
+
   const [loading, setLoading] = useState(false);
   const [report, setReport] = useState<Report | null>(null);
   const [error, setError] = useState<string | null>(null);
