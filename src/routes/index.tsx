@@ -39,7 +39,7 @@ export const Route = createFileRoute("/")({
 function Index() {
   const { q } = Route.useSearch();
   const runAnalysis = useServerFn(analyzeStock);
-  const [query, setQuery] = useState(q);
+  const [query, setQuery] = useState(q ?? "");
   const [picked, setPicked] = useState<StockPick | null>(null);
   const [quantity, setQuantity] = useState("");
   const [price, setPrice] = useState("");
