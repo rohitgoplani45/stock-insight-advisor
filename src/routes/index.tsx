@@ -1,14 +1,16 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { Download, ImageDown, Loader2, Search } from "lucide-react";
+import { Download, ImageDown, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { ReportView } from "@/components/ReportView";
 import { SnapshotCard } from "@/components/SnapshotCard";
+import { StockSearch, type StockPick } from "@/components/StockSearch";
 import { Toaster } from "@/components/ui/sonner";
 import { downloadFile, fetchLog, saveReport, toCsv, type LogRow } from "@/lib/log";
 import { analyzeStock, type Report } from "@/lib/stock.functions";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
